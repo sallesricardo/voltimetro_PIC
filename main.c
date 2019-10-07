@@ -11,17 +11,22 @@
 #include "main.h"
 
 #define DISPLAY PORTB
-#define D_TIME 200
+#define D_TIME 500
+#define DELAY __delay_us
 
 #define D0 PORTCbits.RC3
 #define D1 PORTCbits.RC2
 #define D2 PORTCbits.RC1
 #define D3 PORTCbits.RC0
 
+#define V_CONV 0.0303030303
+
 typedef union {
     uint16_t integer;
     uint8_t part[sizeof(uint16_t)];
 } _uint16_t;
+
+enum { D_1, D_2, D_3, D_4, NEXT} digits;
 
 _uint16_t value_read;
 uint32_t count = 0;
@@ -29,10 +34,11 @@ uint16_t miliseconds = 0;
 uint32_t seconds = 0;
 uint8_t dash = 0;
 
-#define MEDIA 32
+#define MEDIA 8
 uint16_t v_array[MEDIA];
 uint8_t i_array = 0;
 uint32_t acc_value = 0;
+uint16_t v_voltage = 0;
 
 
 uint8_t nums[] = {
@@ -62,6 +68,48 @@ uint8_t nums[] = {
 //    0b00000001
 };
 
+void display(){
+    static uint16_t num = 0;
+    uint16_t d = 0;
+    
+    switch (digits++){
+        case D_1:
+                d = num % 10;
+                DISPLAY = nums[d];
+                D0 = 1; //LED ON
+            break;
+        case D_2:
+                D0 = 0; //LED OFF
+                num = num / 10;
+                d = num % 10;
+                DISPLAY = nums[d];
+                D1 = 1; //LED ON
+            break;
+        case D_3:
+                D1 = 0; //LED OFF
+                num = num / 10;
+                d = num % 10;
+                DISPLAY = 0x80 | nums[d];
+                D2 = 1; //LED ON
+            break;
+        case D_4:
+                D2 = 0; //LED OFF
+                num = num / 10;
+                d = num % 10;
+                DISPLAY = nums[d];
+                D3 = 1; //LED ON
+            break;
+        case NEXT:
+                D3 = 0; //LED OFF
+                DISPLAY = 0x00;
+                num = v_voltage;
+            break;
+        default:
+            digits = 0;
+            break;
+    }
+}
+
 void __interrupt() interrupt_function(){
     if (INTCONbits.TMR0IF){
         INTCONbits.TMR0IF = 0;
@@ -76,6 +124,7 @@ void __interrupt() interrupt_function(){
             seconds++;
             dash = 1;
         }
+        display();
     }
     if (PIR1bits.ADIF){
         PIR1bits.ADIF = 0;
@@ -115,14 +164,15 @@ int main(void) {
     PEIE = 1;
     GIE = 1;
     
-    uint8_t i;
-    for (i = 0;i < MEDIA;i++){
-        v_array[i] = 0;
-    }
+    //uint8_t i;
+    //for (i = 0;i < MEDIA;i++){
+    //    v_array[i] = 0;
+    //}
     ADCON0bits.GO = 1;
     
     uint16_t num,d;
     uint16_t aux = 0;
+    float voltage;
     value_read.integer = 0;
 
     while(1) //Get into the Infinie While loop
@@ -130,10 +180,14 @@ int main(void) {
         CLRWDT();
         //num = seconds;
         //num = count / 100;
+        //num = (uint16_t) voltage;
+        //v_voltage = (uint16_t) voltage;
         aux = value_read.integer;
+        voltage = ((float)aux) * ((float)V_CONV) * 100.0;
+        num = (uint16_t) voltage;
         acc_value -= v_array[i_array];
-        acc_value += aux;
-        v_array[i_array++] = aux;
+        acc_value += num;
+        v_array[i_array++] = num;
         if (i_array >= MEDIA){
             i_array = 0;
         }
@@ -141,39 +195,9 @@ int main(void) {
         if (dash){
             RC4 = !RC4;
             dash = 0;
+            v_voltage = num;
         }
-        d = num % 10;
-        DISPLAY = nums[d];
-        D0=1; //LED ON
-        __delay_us(D_TIME); //Wait
-        D0=0; //LED OFF
-        //__delay_ms(100); //Wait
-        num = num / 10;
-        d = num % 10;
-        DISPLAY = 0x80 | nums[d];
-        D1=1; //LED ON
-        __delay_us(D_TIME); //Wait
-        D1=0; //LED OFF
-        //__delay_ms(100); //Wait
-        num = num / 10;
-        d = num % 10;
-        DISPLAY = nums[d];
-        D2=1; //LED ON
-        __delay_us(D_TIME); //Wait
-        D2=0; //LED OFF
-        //__delay_ms(100); //Wait
-        num = num / 10;
-        d = num % 10;
-        DISPLAY = nums[d];
-        D3=1; //LED ON
-        __delay_us(D_TIME); //Wait
-        D3=0; //LED OFF
-        ///__delay_ms(100); //Wait
-        //RC4=0; //LED OFF
         CLRWDT();
-        DISPLAY = 0x00;
-        //__delay_ms(100); 
-        //Repeat. 
     }
 
 }
