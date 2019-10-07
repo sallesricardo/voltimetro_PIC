@@ -1,7 +1,5 @@
-<<<<<<< HEAD
 build
 dist
-=======
 # Prerequisites
 *.d
 
@@ -54,4 +52,3 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
->>>>>>> 760de5693e3427d0138c07e6a2c0036d2b10bd81
